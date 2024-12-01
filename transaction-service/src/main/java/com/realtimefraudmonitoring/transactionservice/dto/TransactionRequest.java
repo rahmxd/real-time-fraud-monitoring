@@ -4,9 +4,9 @@ import lombok.Data;
 
 @Data
 public class TransactionRequest {
-    private String transactionId;
     private String userId;
-    private double amount;
     private String transactionType; // e.g., "DEBIT", "CREDIT"
-    private String timestamp;
+    private double amount;
+    private String currency;
+    private String status;
 }
