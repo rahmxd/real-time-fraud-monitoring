@@ -42,8 +42,9 @@ public class TransactionService {
 
     private Transaction mapToEntity(TransactionEvent transactionEvent) {
         Transaction transaction = new Transaction();
+        transaction.setTransactionId(transactionEvent.getTransactionId());
         transaction.setUserId(transactionEvent.getUserId());
-        transaction.setTransactionType(transactionEvent.getTransactionType());
+        transaction.setPaymentType(transactionEvent.getPaymentType());
         transaction.setAmount(transactionEvent.getAmount());
         transaction.setCurrency(transactionEvent.getCurrency());
         transaction.setStatus(transactionEvent.getStatus());
@@ -52,8 +53,9 @@ public class TransactionService {
 
     private TransactionEvent mapToDto(Transaction transaction) {
         TransactionEvent dto = new TransactionEvent();
+        dto.setTransactionId(transaction.getTransactionId());
         dto.setUserId(transaction.getUserId());
-        dto.setTransactionType(transaction.getTransactionType());
+        dto.setPaymentType(transaction.getPaymentType());
         dto.setAmount(transaction.getAmount());
         dto.setCurrency(transaction.getCurrency());
         dto.setStatus(transaction.getStatus());

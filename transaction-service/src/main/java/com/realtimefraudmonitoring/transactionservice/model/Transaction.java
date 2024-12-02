@@ -12,18 +12,21 @@ public class Transaction {
     private Long id;
 
     @Column(nullable = false)
+    private String transactionId;
+
+    @Column(nullable = false)
     private String userId;
 
     @Column(nullable = false)
-    private String transactionType; // individual, bulk, batch
+    private String paymentType;
 
     @Column(nullable = false)
-    private Double amount;
+    private double amount;
 
     @Column(nullable = false)
     private String currency;
 
     @Column(nullable = false)
-    private String status; // pending, completed, flagged
+    private String status;
 
 }

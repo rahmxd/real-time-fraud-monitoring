@@ -4,9 +4,10 @@ import lombok.Data;
 
 @Data
 public class TransactionEvent {
-    private String userId;
-    private String transactionType; // e.g., "DEBIT", "CREDIT"
+    private String transactionId; // Unique ID for the transaction
+    private String userId; // ID of the user initiating the transaction
+    private String paymentType; // e.g., "CREDIT", "DEBIT"
     private double amount;
     private String currency;
-    private String status;
+    private String status; // e.g., "PENDING", "COMPLETED"
 }
