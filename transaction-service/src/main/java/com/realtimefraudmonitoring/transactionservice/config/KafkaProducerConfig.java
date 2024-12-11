@@ -21,27 +21,28 @@ public class KafkaProducerConfig {
         this.kafkaProperties = kafkaProperties;
     }
 
+    @Bean
+    public ProducerFactory<String, TransactionEvent> producerFactory() {
+        return new DefaultKafkaProducerFactory<>(kafkaProperties.buildProducerProperties());
+    }
+
+    @Bean
+    public KafkaTemplate<String, TransactionEvent> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+//    To test without schema registry
 //    @Bean
-//    public ProducerFactory<String, TransactionEvent> producerFactory() {
-//        return new DefaultKafkaProducerFactory<>(kafkaProperties.buildProducerProperties());
+//    public ProducerFactory<String, String> producerFactory() {
+//        Map<String, Object> configs = kafkaProperties.buildProducerProperties();
+//        configs.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+//        configs.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+//        return new DefaultKafkaProducerFactory<>(configs);
 //    }
 //
 //    @Bean
-//    public KafkaTemplate<String, TransactionEvent> kafkaTemplate() {
+//    public KafkaTemplate<String, String> kafkaTemplate() {
 //        return new KafkaTemplate<>(producerFactory());
 //    }
-
-    @Bean
-    public ProducerFactory<String, String> producerFactory() {
-        Map<String, Object> configs = kafkaProperties.buildProducerProperties();
-        configs.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        configs.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        return new DefaultKafkaProducerFactory<>(configs);
-    }
-
-    @Bean
-    public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
-    }
 
 }

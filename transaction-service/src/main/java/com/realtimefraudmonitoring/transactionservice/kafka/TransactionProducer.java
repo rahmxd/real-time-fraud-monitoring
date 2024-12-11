@@ -12,30 +12,29 @@ import org.springframework.stereotype.Service;
 public class TransactionProducer {
     private static final Logger logger = LoggerFactory.getLogger(TransactionProducer.class);
 
-//    private final KafkaTemplate<String, TransactionEvent> kafkaTemplate;
+    private final KafkaTemplate<String, TransactionEvent> kafkaTemplate;
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+//    private final KafkaTemplate<String, String> kafkaTemplate;
+//    private final ObjectMapper objectMapper;
 
-//    public TransactionProducer(KafkaTemplate<String, TransactionEvent> kafkaTemplate, ObjectMapper objectMapper) {
+    public TransactionProducer(KafkaTemplate<String, TransactionEvent> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
+
+//    public TransactionProducer(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
 //        this.kafkaTemplate = kafkaTemplate;
 //        this.objectMapper = objectMapper;
 //    }
 
-    public TransactionProducer(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
-    }
-
     public void sendTransaction(TransactionEvent transactionEvent) {
         try {
-            // Serialize the transactionEvent to JSON
-            String transactionJson = objectMapper.writeValueAsString(transactionEvent);
+            // Serialize the transactionEvent to JSON not needed as handled by kafkaTemplate directly
+//            String transactionJson = objectMapper.writeValueAsString(transactionEvent);
             // Log transaction details
             logger.info("Preparing to send transaction: {}", transactionEvent);
             String key = transactionEvent.getTransactionId(); // Partitioning by transactionId
             // Produce the event to the transaction.events topic
-            kafkaTemplate.send("transaction.events", key, transactionJson).addCallback(
+            kafkaTemplate.send("transaction.events", key, transactionEvent).addCallback(
                     result -> {
                         if (result != null) {
                             logger.info("Message sent successfully. Topic: {}, Partition: {}, Offset: {}, Key: {}",
