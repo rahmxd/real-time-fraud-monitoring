@@ -12,12 +12,10 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final TransactionProducer transactionProducer;
-    private final ObjectMapper objectMapper;
 
-    public TransactionService(TransactionRepository transactionRepository, TransactionProducer transactionProducer, ObjectMapper objectMapper) {
+    public TransactionService(TransactionRepository transactionRepository, TransactionProducer transactionProducer) {
         this.transactionRepository = transactionRepository;
         this.transactionProducer = transactionProducer;
-        this.objectMapper = objectMapper;
     }
 
     public TransactionEvent saveTransaction(TransactionEvent transactionEvent) throws Exception {
@@ -31,10 +29,12 @@ public class TransactionService {
         TransactionEvent event = mapToTransactionEvent(savedTransaction);
 
         // Convert transaction to JSON
-        String transactionJson = objectMapper.writeValueAsString(event);
+        // kafkaTemplate is configured to wrok with TransactionEvent objects directly using JSON serializer.
+        // no need to manually serialize the object to JSON in the service layer.
+//        String transactionJson = objectMapper.writeValueAsString(event);
 
         // Publish to kafka now
-        transactionProducer.sendTransaction(event.getUserId(), transactionJson);
+        transactionProducer.sendTransaction(event);
 
         return event;
     }

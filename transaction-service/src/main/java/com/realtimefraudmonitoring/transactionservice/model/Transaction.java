@@ -11,7 +11,7 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String transactionId;
 
     @Column(nullable = false)
@@ -26,8 +26,9 @@ public class Transaction {
     @Column(nullable = false)
     private String currency;
 
+    @Enumerated(EnumType.STRING) // ensures the enum value is stored as a string in the database
     @Column(nullable = false)
-    private String status;
+    private TransactionStatus status;
 
     @Column
     private String bulkId; //to group bulk transactions
