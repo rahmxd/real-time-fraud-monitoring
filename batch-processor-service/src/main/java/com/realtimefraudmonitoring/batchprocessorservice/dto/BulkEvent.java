@@ -1,4 +1,4 @@
-package com.realtimefraudmonitoring.transactionservice.dto;
+package com.realtimefraudmonitoring.batchprocessorservice.dto;
 
 import lombok.Data;
 

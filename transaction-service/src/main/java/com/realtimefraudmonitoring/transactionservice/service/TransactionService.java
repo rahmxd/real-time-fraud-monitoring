@@ -14,22 +14,21 @@ public class TransactionService {
     private final TransactionProducer transactionProducer;
     private final ObjectMapper objectMapper;
 
-
     public TransactionService(TransactionRepository transactionRepository, TransactionProducer transactionProducer, ObjectMapper objectMapper) {
         this.transactionRepository = transactionRepository;
         this.transactionProducer = transactionProducer;
         this.objectMapper = objectMapper;
     }
 
-    public Transaction saveTransaction(TransactionEvent transactionEvent) throws Exception {
+    public TransactionEvent saveTransaction(TransactionEvent transactionEvent) throws Exception {
         // Map DTO to Entity
-        Transaction transaction = mapToEntity(transactionEvent);
+        Transaction transaction = mapToTransactionEntity(transactionEvent);
 
         // Save to the transactiondb database
         Transaction savedTransaction = transactionRepository.save(transaction);
 
         // Map Entity back to DTO for Kafka
-        TransactionEvent event = mapToDto(savedTransaction);
+        TransactionEvent event = mapToTransactionEvent(savedTransaction);
 
         // Convert transaction to JSON
         String transactionJson = objectMapper.writeValueAsString(event);
@@ -37,10 +36,11 @@ public class TransactionService {
         // Publish to kafka now
         transactionProducer.sendTransaction(event.getUserId(), transactionJson);
 
-        return savedTransaction;
+        return event;
     }
 
-    private Transaction mapToEntity(TransactionEvent transactionEvent) {
+
+    private Transaction mapToTransactionEntity(TransactionEvent transactionEvent) {
         Transaction transaction = new Transaction();
         transaction.setTransactionId(transactionEvent.getTransactionId());
         transaction.setUserId(transactionEvent.getUserId());
@@ -51,7 +51,7 @@ public class TransactionService {
         return transaction;
     }
 
-    private TransactionEvent mapToDto(Transaction transaction) {
+    private TransactionEvent mapToTransactionEvent(Transaction transaction) {
         TransactionEvent dto = new TransactionEvent();
         dto.setTransactionId(transaction.getTransactionId());
         dto.setUserId(transaction.getUserId());

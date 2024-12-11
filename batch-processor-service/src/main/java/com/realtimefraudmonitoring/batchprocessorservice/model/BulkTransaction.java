@@ -1,4 +1,4 @@
-package com.realtimefraudmonitoring.transactionservice.model;
+package com.realtimefraudmonitoring.batchprocessorservice.model;
 
 import lombok.Data;
 
@@ -17,5 +17,5 @@ public class BulkTransaction {
     private String bulkId;
 
     @OneToMany(cascade = CascadeType.ALL)
-    private List<Transaction> transactions;
+    private List<SingleTransaction> transactions;
 }

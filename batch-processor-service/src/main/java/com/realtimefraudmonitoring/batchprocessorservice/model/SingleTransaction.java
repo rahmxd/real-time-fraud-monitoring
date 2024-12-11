@@ -1,4 +1,4 @@
-package com.realtimefraudmonitoring.transactionservice.model;
+package com.realtimefraudmonitoring.batchprocessorservice.model;
 
 import lombok.Data;
 
@@ -6,7 +6,7 @@ import javax.persistence.*;
 
 @Data
 @Entity
-public class Transaction {
+public class SingleTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
