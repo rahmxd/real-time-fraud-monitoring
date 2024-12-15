@@ -3,6 +3,7 @@ package com.realtimefraudmonitoring.transactionservice.model;
 import lombok.Data;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 
 @Data
 @Entity
@@ -20,8 +21,8 @@ public class Transaction {
     @Column(nullable = false)
     private String paymentType;
 
-    @Column(nullable = false)
-    private double amount;
+    @Column(nullable = false, precision = 19, scale = 4) // Precision for BigDecimal
+    private BigDecimal amount;
 
     @Column(nullable = false)
     private String currency;

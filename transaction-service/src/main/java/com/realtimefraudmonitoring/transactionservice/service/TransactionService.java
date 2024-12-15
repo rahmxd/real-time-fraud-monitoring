@@ -48,6 +48,8 @@ public class TransactionService {
         transaction.setAmount(transactionEvent.getAmount());
         transaction.setCurrency(transactionEvent.getCurrency());
         transaction.setStatus(transactionEvent.getStatus());
+        transaction.setBulkId(transactionEvent.getBulkId());
+        transaction.setBatchId(transactionEvent.getBatchId());
         return transaction;
     }
 
@@ -59,6 +61,8 @@ public class TransactionService {
         dto.setAmount(transaction.getAmount());
         dto.setCurrency(transaction.getCurrency());
         dto.setStatus(transaction.getStatus());
+        dto.setBulkId(transaction.getBulkId());
+        dto.setBatchId(transaction.getBatchId());
         return dto;
     }
 

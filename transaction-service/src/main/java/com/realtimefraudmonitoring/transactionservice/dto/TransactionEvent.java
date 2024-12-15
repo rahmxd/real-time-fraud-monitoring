@@ -1,36 +1,40 @@
 package com.realtimefraudmonitoring.transactionservice.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.realtimefraudmonitoring.transactionservice.config.StrictBigDecimalDeserializer;
 import com.realtimefraudmonitoring.transactionservice.model.TransactionStatus;
 import lombok.Data;
 
-//import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
-
+import java.math.BigDecimal;
 
 @Data
 public class TransactionEvent {
-    @NotNull(message = "Transaction ID cannot be null")
-    private String transactionId; // Unique ID for the transaction
 
-    @NotNull(message = "User ID cannot be null")
-    private String userId; // ID of the user initiating the transaction
+    @NotBlank(message = "Transaction ID cannot be blank")
+    private String transactionId;
 
-    @NotNull(message = "Payment type cannot be null")
+    @NotBlank(message = "User ID cannot be blank")
+    private String userId;
+
+    @NotBlank(message = "Payment type cannot be blank")
     @Pattern(regexp = "CREDIT|DEBIT", message = "Payment type must be CREDIT or DEBIT")
-    private String paymentType; // e.g., "CREDIT", "DEBIT"
+    private String paymentType;
 
+    @JsonDeserialize(using = StrictBigDecimalDeserializer.class)
     @NotNull(message = "Amount cannot be null")
-//    @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
-    private double amount;
+    @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
+    private BigDecimal amount;
 
-    @NotNull(message = "Currency cannot be null")
+    @NotBlank(message = "Currency cannot be blank")
     private String currency;
 
     @NotNull(message = "Status cannot be null")
-    private TransactionStatus status; // e.g., "PENDING", "COMPLETED", "FAILED", "SUSPICIOUS"
+    private TransactionStatus status;
 
-    // Optional metadata not sure whether to include
-    private String bulkId; // Used for bulk transactions
-    private String batchId; // Used for batch transactions
+    private String bulkId; // Optional
+    private String batchId; // Optional
 }
