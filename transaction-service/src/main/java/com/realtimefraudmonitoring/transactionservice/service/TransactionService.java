@@ -7,9 +7,11 @@ import com.realtimefraudmonitoring.transactionservice.model.Transaction;
 import com.realtimefraudmonitoring.transactionservice.model.TransactionStatus;
 import com.realtimefraudmonitoring.transactionservice.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class TransactionService {
@@ -22,16 +24,22 @@ public class TransactionService {
         this.transactionProducer = transactionProducer;
     }
 
-    public TransactionEventDTO saveTransaction(TransactionEventDTO transactionEventDTO) {
-        // Map DTO to Entity and save to the database
-        Transaction transactionEntity = mapToTransactionEntity(transactionEventDTO);
-        transactionRepository.save(transactionEntity);
+    // If saving to db fails then Kafka event is not triggered
+    @Transactional
+    public CompletableFuture<TransactionEventDTO> saveTransactionAsync(TransactionEventDTO transactionEventDTO) {
+        return CompletableFuture.supplyAsync(() -> {
+            transactionEventDTO.validateBulkOrBatch();
 
-        // Map DTO to Avro and send to Kafka
-        TransactionEvent avroEvent = mapToAvro(transactionEventDTO);
-        transactionProducer.sendTransaction(avroEvent);
+            // Save to DB
+            Transaction transactionEntity = mapToTransactionEntity(transactionEventDTO);
+            transactionRepository.save(transactionEntity);
 
-        return transactionEventDTO;
+            // Send to Kafka
+            TransactionEvent avroEvent = mapToAvro(transactionEventDTO);
+            transactionProducer.sendTransaction(avroEvent);
+
+            return transactionEventDTO;
+        });
     }
 
     private Transaction mapToTransactionEntity(TransactionEventDTO dto) {
@@ -61,17 +69,9 @@ public class TransactionService {
     }
 
     private com.realtimefraudmonitoring.avro.TransactionStatus mapToAvroStatus(TransactionStatus status) {
-        switch (status) {
-            case PENDING:
-                return com.realtimefraudmonitoring.avro.TransactionStatus.PENDING;
-            case COMPLETED:
-                return com.realtimefraudmonitoring.avro.TransactionStatus.COMPLETED;
-            case FAILED:
-                return com.realtimefraudmonitoring.avro.TransactionStatus.FAILED;
-            case SUSPICIOUS:
-                return com.realtimefraudmonitoring.avro.TransactionStatus.SUSPICIOUS;
-            default:
-                throw new IllegalArgumentException("Unknown status: " + status);
+        if (status == null) {
+            throw new IllegalArgumentException("TransactionStatus cannot be null");
         }
+        return com.realtimefraudmonitoring.avro.TransactionStatus.valueOf(status.name());
     }
 }

@@ -37,4 +37,7 @@ public class Transaction {
     @Column
     private String batchId;
 
+    @Column(nullable = false)
+    private boolean acknowledged = false;
+
 }

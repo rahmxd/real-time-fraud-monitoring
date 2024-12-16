@@ -37,4 +37,11 @@ public class TransactionEventDTO {
 
     private String bulkId; // Optional
     private String batchId; // Optional
+
+    //to call wherever dto is processed e.g. saveTransaction method
+    public void validateBulkOrBatch() {
+        if (bulkId != null && batchId != null) {
+            throw new IllegalArgumentException("Transaction cannot belong to both a bulk and a batch.");
+        }
+    }
 }

@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/transaction")
@@ -23,9 +24,11 @@ public class TransactionController {
     }
 
     @PostMapping
-    public ResponseEntity<TransactionEventDTO> createTransaction(@Valid @RequestBody TransactionEventDTO transactionEventDTO) throws Exception {
+    public CompletableFuture<ResponseEntity<TransactionEventDTO>> createTransaction(
+            @Valid @RequestBody TransactionEventDTO transactionEventDTO
+    ) throws Exception {
         logger.info("Received transaction event: {}", transactionEventDTO);
-        TransactionEventDTO savedTransaction = transactionService.saveTransaction(transactionEventDTO);
-        return ResponseEntity.ok(savedTransaction);
+        return transactionService.saveTransactionAsync(transactionEventDTO)
+                .thenApply(ResponseEntity::ok);
     }
 }
