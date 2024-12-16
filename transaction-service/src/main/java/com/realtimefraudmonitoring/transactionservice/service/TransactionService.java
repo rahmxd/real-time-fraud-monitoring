@@ -1,11 +1,15 @@
 package com.realtimefraudmonitoring.transactionservice.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.realtimefraudmonitoring.transactionservice.dto.TransactionEvent;
+import com.realtimefraudmonitoring.avro.TransactionEvent;
+import com.realtimefraudmonitoring.transactionservice.dto.TransactionEventDTO;
 import com.realtimefraudmonitoring.transactionservice.kafka.TransactionProducer;
 import com.realtimefraudmonitoring.transactionservice.model.Transaction;
+import com.realtimefraudmonitoring.transactionservice.model.TransactionStatus;
 import com.realtimefraudmonitoring.transactionservice.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 
 @Service
 public class TransactionService {
@@ -18,52 +22,56 @@ public class TransactionService {
         this.transactionProducer = transactionProducer;
     }
 
-    public TransactionEvent saveTransaction(TransactionEvent transactionEvent) throws Exception {
-        // Map DTO to Entity
-        Transaction transaction = mapToTransactionEntity(transactionEvent);
+    public TransactionEventDTO saveTransaction(TransactionEventDTO transactionEventDTO) {
+        // Map DTO to Entity and save to the database
+        Transaction transactionEntity = mapToTransactionEntity(transactionEventDTO);
+        transactionRepository.save(transactionEntity);
 
-        // Save to the transactiondb database
-        Transaction savedTransaction = transactionRepository.save(transaction);
+        // Map DTO to Avro and send to Kafka
+        TransactionEvent avroEvent = mapToAvro(transactionEventDTO);
+        transactionProducer.sendTransaction(avroEvent);
 
-        // Map Entity back to DTO for Kafka
-        TransactionEvent event = mapToTransactionEvent(savedTransaction);
-
-        // Convert transaction to JSON
-        // kafkaTemplate is configured to wrok with TransactionEvent objects directly using JSON serializer.
-        // no need to manually serialize the object to JSON in the service layer.
-//        String transactionJson = objectMapper.writeValueAsString(event);
-
-        // Publish to kafka now
-        transactionProducer.sendTransaction(event);
-
-        return event;
+        return transactionEventDTO;
     }
 
-
-    private Transaction mapToTransactionEntity(TransactionEvent transactionEvent) {
+    private Transaction mapToTransactionEntity(TransactionEventDTO dto) {
         Transaction transaction = new Transaction();
-        transaction.setTransactionId(transactionEvent.getTransactionId());
-        transaction.setUserId(transactionEvent.getUserId());
-        transaction.setPaymentType(transactionEvent.getPaymentType());
-        transaction.setAmount(transactionEvent.getAmount());
-        transaction.setCurrency(transactionEvent.getCurrency());
-        transaction.setStatus(transactionEvent.getStatus());
-        transaction.setBulkId(transactionEvent.getBulkId());
-        transaction.setBatchId(transactionEvent.getBatchId());
+        transaction.setTransactionId(dto.getTransactionId());
+        transaction.setUserId(dto.getUserId());
+        transaction.setPaymentType(dto.getPaymentType());
+        transaction.setAmount(dto.getAmount());
+        transaction.setCurrency(dto.getCurrency());
+        transaction.setStatus(dto.getStatus());
+        transaction.setBulkId(dto.getBulkId());
+        transaction.setBatchId(dto.getBatchId());
         return transaction;
     }
 
-    private TransactionEvent mapToTransactionEvent(Transaction transaction) {
-        TransactionEvent dto = new TransactionEvent();
-        dto.setTransactionId(transaction.getTransactionId());
-        dto.setUserId(transaction.getUserId());
-        dto.setPaymentType(transaction.getPaymentType());
-        dto.setAmount(transaction.getAmount());
-        dto.setCurrency(transaction.getCurrency());
-        dto.setStatus(transaction.getStatus());
-        dto.setBulkId(transaction.getBulkId());
-        dto.setBatchId(transaction.getBatchId());
-        return dto;
+    private TransactionEvent mapToAvro(TransactionEventDTO dto) {
+        return TransactionEvent.newBuilder()
+                .setTransactionId(dto.getTransactionId())
+                .setUserId(dto.getUserId())
+                .setPaymentType(com.realtimefraudmonitoring.avro.PaymentType.valueOf(dto.getPaymentType()))
+                .setAmount(ByteBuffer.wrap(dto.getAmount().unscaledValue().toByteArray())) //converted to ByteBuffer
+                .setCurrency(dto.getCurrency())
+                .setStatus(mapToAvroStatus(dto.getStatus()))
+                .setBulkId(dto.getBulkId())
+                .setBatchId(dto.getBatchId())
+                .build();
     }
 
+    private com.realtimefraudmonitoring.avro.TransactionStatus mapToAvroStatus(TransactionStatus status) {
+        switch (status) {
+            case PENDING:
+                return com.realtimefraudmonitoring.avro.TransactionStatus.PENDING;
+            case COMPLETED:
+                return com.realtimefraudmonitoring.avro.TransactionStatus.COMPLETED;
+            case FAILED:
+                return com.realtimefraudmonitoring.avro.TransactionStatus.FAILED;
+            case SUSPICIOUS:
+                return com.realtimefraudmonitoring.avro.TransactionStatus.SUSPICIOUS;
+            default:
+                throw new IllegalArgumentException("Unknown status: " + status);
+        }
+    }
 }

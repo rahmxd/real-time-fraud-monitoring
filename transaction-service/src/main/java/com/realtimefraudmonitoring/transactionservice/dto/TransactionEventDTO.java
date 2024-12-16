@@ -12,7 +12,7 @@ import javax.validation.constraints.Pattern;
 import java.math.BigDecimal;
 
 @Data
-public class TransactionEvent {
+public class TransactionEventDTO {
 
     @NotBlank(message = "Transaction ID cannot be blank")
     private String transactionId;

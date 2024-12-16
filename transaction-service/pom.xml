@@ -55,10 +55,16 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
-		<!-- Kafka JSON Schema Serializer -->
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>1.11.1</version>
+		</dependency>
+
+		<!-- Avro Serializer -->
 		<dependency>
 			<groupId>io.confluent</groupId>
-			<artifactId>kafka-json-schema-serializer</artifactId>
+			<artifactId>kafka-avro-serializer</artifactId>
 			<version>7.5.0</version>
 		</dependency>
 
@@ -100,6 +106,24 @@
 						</exclude>
 					</excludes>
 				</configuration>
+			</plugin>
+			<!-- Avro Plugin for Schema Generation -->
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>1.11.1</version>
+				<executions>
+					<execution>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<sourceDirectory>${project.basedir}/src/main/resources/avro</sourceDirectory>
+							<outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

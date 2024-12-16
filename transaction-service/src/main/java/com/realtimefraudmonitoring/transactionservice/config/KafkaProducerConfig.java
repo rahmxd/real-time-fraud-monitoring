@@ -1,6 +1,8 @@
 package com.realtimefraudmonitoring.transactionservice.config;
 
-import com.realtimefraudmonitoring.transactionservice.dto.TransactionEvent;
+import com.realtimefraudmonitoring.transactionservice.dto.TransactionEventDTO;
+//import org.apache.kafka.clients.producer.ProducerConfig;
+import com.realtimefraudmonitoring.avro.TransactionEvent;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,18 +42,19 @@ public class KafkaProducerConfig {
     @Profile("schema")
     @Bean
     public ProducerFactory<String, TransactionEvent> producerFactoryTransactionEvent() {
-        System.out.println("Active Profile: Using Schema Registry with KafkaJsonSchemaSerializer.");
+        System.out.println("Active Profile: Using Schema Registry with KafkaJAvroSerializer.");
         Map<String, Object> configs = kafkaProperties.buildProducerProperties();
         configs.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        configs.put("value.serializer", "io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer");
-        configs.put("schema.registry.url", "http://localhost:8081");
+        configs.put("value.serializer", "io.confluent.kafka.serializers.KafkaAvroSerializer");
+        configs.put("schema.registry.url", "http://localhost:8081"); // Update with your Schema Registry URL
+        configs.put("auto.register.schemas", true); // Ensure schema is auto-registered
         return new DefaultKafkaProducerFactory<>(configs);
     }
 
     @Profile("schema")
     @Bean
     public KafkaTemplate<String, TransactionEvent> kafkaTemplateTransactionEvent() {
-        System.out.println("Active Profile: KafkaTemplate<String, TransactionEvent> initialized for Schema Registry.");
+        System.out.println("Active Profile: KafkaTemplate<String, Object> initialized for Schema Registry.");
         return new KafkaTemplate<>(producerFactoryTransactionEvent());
     }
 }

@@ -2,6 +2,8 @@ server:
   port: 8082
 
 spring:
+  profiles:
+    active: schema
   jackson:
     deserialization:
       fail-on-invalid-subtype: true
@@ -15,7 +17,8 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+#      ddl-auto: update
+      ddl-auto: create
     show-sql: true
 #  kafka:
 #    bootstrap-servers: localhost:9092
