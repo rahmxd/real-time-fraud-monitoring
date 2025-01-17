@@ -19,6 +19,8 @@ public class TransactionProducer {
     }
 
     public void sendTransaction(TransactionEvent transactionEvent) {
+        transactionEvent.setSource("transaction-service");
+
         //get key but have to convert CharSequence to String
         String key = transactionEvent.getTransactionId().toString();
         logger.info("Sending transaction event with key: {}", key);

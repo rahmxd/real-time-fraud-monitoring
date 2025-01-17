@@ -18,6 +18,8 @@
     { "name": "currency", "type": "string" },
     { "name": "status", "type": { "type": "enum", "name": "TransactionStatus", "symbols": ["PENDING", "COMPLETED", "FAILED", "SUSPICIOUS"] } },
     { "name": "bulkId", "type": ["null", "string"], "default": null },
-    { "name": "batchId", "type": ["null", "string"], "default": null }
+    { "name": "batchId", "type": ["null", "string"], "default": null },
+    { "name": "splitId", "type": ["null", "string"], "default": null },
+    { "name": "source", "type": "string" }
   ]
 }

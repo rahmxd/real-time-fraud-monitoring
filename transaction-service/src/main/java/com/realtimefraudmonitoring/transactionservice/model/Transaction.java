@@ -40,4 +40,7 @@ public class Transaction {
     @Column(nullable = false)
     private boolean acknowledged = false;
 
+    @Column
+    private String source;
+
 }

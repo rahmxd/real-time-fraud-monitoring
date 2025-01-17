@@ -37,6 +37,7 @@ public class TransactionEventDTO {
 
     private String bulkId; // Optional
     private String batchId; // Optional
+    private String source; // e.g. "transaction-service"
 
     //to call wherever dto is processed e.g. saveTransaction method
     public void validateBulkOrBatch() {
