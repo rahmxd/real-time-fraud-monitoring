@@ -1,63 +1,77 @@
 package com.realtimefraudmonitoring.transactionservice.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.realtimefraudmonitoring.transactionservice.dto.TransactionEvent;
+import com.realtimefraudmonitoring.avro.TransactionEvent;
+import com.realtimefraudmonitoring.transactionservice.dto.TransactionEventDTO;
 import com.realtimefraudmonitoring.transactionservice.kafka.TransactionProducer;
 import com.realtimefraudmonitoring.transactionservice.model.Transaction;
+import com.realtimefraudmonitoring.transactionservice.model.TransactionStatus;
 import com.realtimefraudmonitoring.transactionservice.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final TransactionProducer transactionProducer;
-    private final ObjectMapper objectMapper;
 
-
-    public TransactionService(TransactionRepository transactionRepository, TransactionProducer transactionProducer, ObjectMapper objectMapper) {
+    public TransactionService(TransactionRepository transactionRepository, TransactionProducer transactionProducer) {
         this.transactionRepository = transactionRepository;
         this.transactionProducer = transactionProducer;
-        this.objectMapper = objectMapper;
     }
 
-    public Transaction saveTransaction(TransactionEvent transactionEvent) throws Exception {
-        // Map DTO to Entity
-        Transaction transaction = mapToEntity(transactionEvent);
+    // If saving to db fails then Kafka event is not triggered
+    @Transactional
+    public CompletableFuture<TransactionEventDTO> saveTransactionAsync(TransactionEventDTO transactionEventDTO) {
+        return CompletableFuture.supplyAsync(() -> {
+            transactionEventDTO.validateBulkOrBatch();
 
-        // Save to the transactiondb database
-        Transaction savedTransaction = transactionRepository.save(transaction);
+            // Save to DB
+            Transaction transactionEntity = mapToTransactionEntity(transactionEventDTO);
+            transactionRepository.save(transactionEntity);
 
-        // Map Entity back to DTO for Kafka
-        TransactionEvent event = mapToDto(savedTransaction);
+            // Send to Kafka
+            TransactionEvent avroEvent = mapToAvro(transactionEventDTO);
+            transactionProducer.sendTransaction(avroEvent);
 
-        // Convert transaction to JSON
-        String transactionJson = objectMapper.writeValueAsString(event);
-
-        // Publish to kafka now
-        transactionProducer.sendTransaction(event.getUserId(), transactionJson);
-
-        return savedTransaction;
+            return transactionEventDTO;
+        });
     }
 
-    private Transaction mapToEntity(TransactionEvent transactionEvent) {
+    private Transaction mapToTransactionEntity(TransactionEventDTO dto) {
         Transaction transaction = new Transaction();
-        transaction.setUserId(transactionEvent.getUserId());
-        transaction.setTransactionType(transactionEvent.getTransactionType());
-        transaction.setAmount(transactionEvent.getAmount());
-        transaction.setCurrency(transactionEvent.getCurrency());
-        transaction.setStatus(transactionEvent.getStatus());
+        transaction.setTransactionId(dto.getTransactionId());
+        transaction.setUserId(dto.getUserId());
+        transaction.setPaymentType(dto.getPaymentType());
+        transaction.setAmount(dto.getAmount());
+        transaction.setCurrency(dto.getCurrency());
+        transaction.setStatus(dto.getStatus());
+        transaction.setBulkId(dto.getBulkId());
+        transaction.setBatchId(dto.getBatchId());
         return transaction;
     }
 
-    private TransactionEvent mapToDto(Transaction transaction) {
-        TransactionEvent dto = new TransactionEvent();
-        dto.setUserId(transaction.getUserId());
-        dto.setTransactionType(transaction.getTransactionType());
-        dto.setAmount(transaction.getAmount());
-        dto.setCurrency(transaction.getCurrency());
-        dto.setStatus(transaction.getStatus());
-        return dto;
+    private TransactionEvent mapToAvro(TransactionEventDTO dto) {
+        return TransactionEvent.newBuilder()
+                .setTransactionId(dto.getTransactionId())
+                .setUserId(dto.getUserId())
+                .setPaymentType(com.realtimefraudmonitoring.avro.PaymentType.valueOf(dto.getPaymentType()))
+                .setAmount(ByteBuffer.wrap(dto.getAmount().unscaledValue().toByteArray())) //converted to ByteBuffer
+                .setCurrency(dto.getCurrency())
+                .setStatus(mapToAvroStatus(dto.getStatus()))
+                .setBulkId(dto.getBulkId())
+                .setBatchId(dto.getBatchId())
+                .build();
     }
 
+    private com.realtimefraudmonitoring.avro.TransactionStatus mapToAvroStatus(TransactionStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("TransactionStatus cannot be null");
+        }
+        return com.realtimefraudmonitoring.avro.TransactionStatus.valueOf(status.name());
+    }
 }

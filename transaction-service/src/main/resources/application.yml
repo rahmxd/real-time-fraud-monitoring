@@ -1,12 +1,13 @@
 server:
-  port: 8081
+  port: 8082
 
 spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  profiles:
+    active: schema
+  jackson:
+    deserialization:
+      fail-on-invalid-subtype: true
+      fail-on-unknown-properties: true
 
   datasource:
     url: jdbc:postgresql://localhost:5432/transactiondb
@@ -16,5 +17,14 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+#      ddl-auto: update
+      ddl-auto: create
     show-sql: true
+#  kafka:
+#    bootstrap-servers: localhost:9092
+#    producer:
+#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+##      value-serializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer
+#      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+##    properties:
+##      schema.registry.url: http://localhost:8081

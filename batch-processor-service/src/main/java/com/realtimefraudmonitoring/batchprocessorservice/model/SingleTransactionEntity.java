@@ -1,4 +1,4 @@
-package com.realtimefraudmonitoring.transactionservice.model;
+package com.realtimefraudmonitoring.batchprocessorservice.model;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 
 @Data
 @Entity
-public class Transaction {
+public class SingleTransactionEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -31,16 +31,26 @@ public class Transaction {
     @Column(nullable = false)
     private TransactionStatus status;
 
-    @Column
+    @Column(name = "bulk_id")
     private String bulkId; //to group bulk transactions
 
-    @Column
+    @Column(name = "batch_id")
     private String batchId;
 
     @Column(nullable = false)
     private boolean acknowledged = false;
 
     @Column
-    private String source;
+    private String splitId;
 
+    @Column
+    private String source; //e.g. "batch-processor-service")
+
+    @ManyToOne
+    @JoinColumn(name = "bulk_id", referencedColumnName = "bulkId")
+    private BulkEntity bulkEntity;
+
+    @ManyToOne
+    @JoinColumn(name = "bulk_id", referencedColumnName = "batchId")
+    private BatchEntity batchEntity;
 }
