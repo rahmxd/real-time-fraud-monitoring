@@ -1,8 +1,9 @@
 package com.realtimefraudmonitoring.batchprocessorservice.controller;
 
-import com.realtimefraudmonitoring.batchprocessorservice.dto.BatchEvent;
-import com.realtimefraudmonitoring.batchprocessorservice.dto.BulkEvent;
-import com.realtimefraudmonitoring.batchprocessorservice.dto.TransactionEvent;
+import com.realtimefraudmonitoring.avro.BatchEvent;
+import com.realtimefraudmonitoring.avro.BulkEvent;
+import com.realtimefraudmonitoring.batchprocessorservice.dto.BatchEventDTO;
+import com.realtimefraudmonitoring.batchprocessorservice.dto.BulkEventDTO;
 import com.realtimefraudmonitoring.batchprocessorservice.service.BatchBulkService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,12 +11,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import javax.validation.Valid;
 
 @RestController
 @RequestMapping("/api")
 public class BatchBulkController {
-
 
     private final BatchBulkService batchBulkService;
 
@@ -23,22 +23,20 @@ public class BatchBulkController {
         this.batchBulkService = batchBulkService;
     }
 
-    // Endpoint for bulk transactions
     @PostMapping("/bulk")
-    public ResponseEntity<List<TransactionEvent>> createBulkTransactions(@RequestBody BulkEvent bulkEvent) {
+    public ResponseEntity<BulkEventDTO> createBulkTransactions(@Valid @RequestBody BulkEventDTO bulkEventDTO) {
         try {
-            List<TransactionEvent> savedTransactions = batchBulkService.saveBulkTransactions(bulkEvent);
-            return ResponseEntity.ok(savedTransactions);
+            BulkEventDTO savedBulk = batchBulkService.saveBulkTransactions(bulkEventDTO);
+            return ResponseEntity.ok(savedBulk);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
         }
     }
 
-    // Endpoint for batch transactions
     @PostMapping("/batch")
-    public ResponseEntity<BatchEvent> createBatchTransactions(@RequestBody BatchEvent batchTransaction) {
+    public ResponseEntity<BatchEventDTO> createBatchTransactions(@Valid @RequestBody BatchEventDTO batchEventDTO) {
         try {
-            BatchEvent savedBatch = batchBulkService.saveBatchTransactions(batchTransaction);
+            BatchEventDTO savedBatch = batchBulkService.saveBatchTransactions(batchEventDTO);
             return ResponseEntity.ok(savedBatch);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();

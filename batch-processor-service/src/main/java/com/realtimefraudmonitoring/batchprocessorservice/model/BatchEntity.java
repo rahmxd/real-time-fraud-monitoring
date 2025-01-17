@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 @Entity
-public class BatchTransaction {
+public class BatchEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,9 +18,16 @@ public class BatchTransaction {
     @Column(nullable = false)
     private String batchType; //e.g. "PAYROLL", "DISBURSEMENT"
 
+    //needs to go
     @Column(nullable = false)
-    private String status;
+    private TransactionStatus status;
 
-    @OneToMany(cascade = CascadeType.ALL)
-    private List<SingleTransaction> transactions;
+    @OneToMany(mappedBy= "batchEntity", cascade = CascadeType.ALL)
+    private List<SingleTransactionEntity> transactions;
+
+    @Column(nullable = false)
+    private boolean acknowledged = false;
+
+    @Column
+    private String splitId;
 }

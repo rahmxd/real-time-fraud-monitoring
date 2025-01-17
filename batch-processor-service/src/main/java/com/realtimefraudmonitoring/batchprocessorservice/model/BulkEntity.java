@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 @Entity
-public class BulkTransaction {
+public class BulkEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,6 +16,9 @@ public class BulkTransaction {
     @Column(nullable = false)
     private String bulkId;
 
-    @OneToMany(cascade = CascadeType.ALL)
-    private List<SingleTransaction> transactions;
+    @OneToMany(mappedBy = "bulkEntity", cascade = CascadeType.ALL)
+    private List<SingleTransactionEntity> transactions;
+
+    @Column(nullable = false)
+    private boolean acknowledged = false;
 }

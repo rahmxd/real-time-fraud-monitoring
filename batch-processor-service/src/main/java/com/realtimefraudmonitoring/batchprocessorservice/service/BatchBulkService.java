@@ -1,147 +1,198 @@
 package com.realtimefraudmonitoring.batchprocessorservice.service;
 
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.realtimefraudmonitoring.batchprocessorservice.dto.BatchEvent;
-import com.realtimefraudmonitoring.batchprocessorservice.dto.BulkEvent;
-import com.realtimefraudmonitoring.batchprocessorservice.dto.TransactionEvent;
-import com.realtimefraudmonitoring.batchprocessorservice.kafka.BatchProducer;
-import com.realtimefraudmonitoring.batchprocessorservice.kafka.BulkProducer;
-import com.realtimefraudmonitoring.batchprocessorservice.model.BatchTransaction;
-import com.realtimefraudmonitoring.batchprocessorservice.model.SingleTransaction;
+import com.realtimefraudmonitoring.avro.BatchEvent;
+import com.realtimefraudmonitoring.avro.BulkEvent;
+import com.realtimefraudmonitoring.avro.TransactionEvent;
+import com.realtimefraudmonitoring.avro.TransactionStatus;
+import com.realtimefraudmonitoring.batchprocessorservice.dto.BatchEventDTO;
+import com.realtimefraudmonitoring.batchprocessorservice.dto.BulkEventDTO;
+import com.realtimefraudmonitoring.batchprocessorservice.dto.TransactionEventDTO;
+import com.realtimefraudmonitoring.batchprocessorservice.kafka.consumer.BulkAcknowledgmentConsumer;
+import com.realtimefraudmonitoring.batchprocessorservice.kafka.producer.BatchProducer;
+import com.realtimefraudmonitoring.batchprocessorservice.kafka.producer.BulkProducer;
+import com.realtimefraudmonitoring.batchprocessorservice.model.BatchEntity;
+import com.realtimefraudmonitoring.batchprocessorservice.model.BulkEntity;
+import com.realtimefraudmonitoring.batchprocessorservice.model.SingleTransactionEntity;
 import com.realtimefraudmonitoring.batchprocessorservice.repository.BatchRepository;
-import com.realtimefraudmonitoring.batchprocessorservice.repository.TransactionRepository;
-//import com.realtimefraudmonitoring.transactionservice.dto.BatchEvent;
-//import com.realtimefraudmonitoring.transactionservice.dto.BulkEvent;
-//import com.realtimefraudmonitoring.transactionservice.dto.TransactionEvent;
-//import com.realtimefraudmonitoring.transactionservice.kafka.TransactionProducer;
-//import com.realtimefraudmonitoring.transactionservice.model.BatchTransaction;
-//import com.realtimefraudmonitoring.transactionservice.model.Transaction;
-//import com.realtimefraudmonitoring.transactionservice.repository.BatchTransactionRepository;
-//import com.realtimefraudmonitoring.transactionservice.repository.TransactionRepository;
+import com.realtimefraudmonitoring.batchprocessorservice.repository.BulkRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+
+import static com.realtimefraudmonitoring.batchprocessorservice.util.MappingUtil.*;
 
 @Service
 public class BatchBulkService {
 
-
-
+    private static final Logger logger = LoggerFactory.getLogger(BatchBulkService.class);
     private final BatchRepository batchRepository;
-
-    private final TransactionRepository transactionRepository;
-
+    private final BulkRepository bulkRepository;
     private final BatchProducer batchProducer;
-
     private final BulkProducer bulkProducer;
-    private final ObjectMapper objectMapper;
 
-    public BatchBulkService(BatchRepository batchRepository, TransactionRepository transactionRepository, BatchProducer batchProducer, BulkProducer bulkProducer,  ObjectMapper objectMapper) {
+    public BatchBulkService(BatchRepository batchRepository, BulkRepository bulkRepository,
+                            BatchProducer batchProducer, BulkProducer bulkProducer) {
         this.batchRepository = batchRepository;
-        this.transactionRepository = transactionRepository;
+        this.bulkRepository = bulkRepository;
         this.batchProducer = batchProducer;
         this.bulkProducer = bulkProducer;
-        this.objectMapper = objectMapper;
     }
 
 
-    public List<TransactionEvent> saveBulkTransactions(BulkEvent bulkEvent) throws Exception {
-        List<TransactionEvent> events = new ArrayList<>();
-        List<SingleTransaction> transactionsListToSave = new ArrayList<>();
+    @Transactional
+    @Async("batchProcessorExecutor")
+    public BatchEventDTO saveBatchTransactions(BatchEventDTO batchEventDTO) {
+        BatchEntity batchEntity = new BatchEntity();
+        batchEntity.setBatchId(batchEventDTO.getBatchId());
+        batchEntity.setBatchType(batchEventDTO.getBatchType());
+        batchEntity.setTransactions(new ArrayList<>());
 
-        // Generate a unique bulkId for this operation
-        String bulkId = bulkEvent.getBulkId();
+        List<TransactionEvent> allTransactions = new ArrayList<>();
 
-        //Map each transactionEvent to a transactionEntity to prepare to save to db
-        for (TransactionEvent transaction : bulkEvent.getTransactions()) {
-            SingleTransaction transactionToSave = mapToTransactionEntity(transaction);
-            transactionToSave.setBulkId(bulkId); //add bulkId to each transaction
-            transactionsListToSave.add(transactionToSave);
+        // Split batch into chunks
+        int chunkSize = 25; // Define split size
+        List<List<TransactionEventDTO>> chunks = splitBatch(batchEventDTO.getTransactions(), chunkSize);
+
+        // Process each chunk async
+        for (List<TransactionEventDTO> chunk : chunks) {
+            String splitId = UUID.randomUUID().toString(); // Assign splitId for each chunk
+            List<TransactionEvent> splitTransactions = new ArrayList<>();
+
+            for (TransactionEventDTO transactionDTO : chunk) {
+                transactionDTO.validateBulkOrBatch();
+                SingleTransactionEntity transaction = mapToTransactionEntity(transactionDTO, batchEntity, splitId);
+                transaction.setBatchId(batchEventDTO.getBatchId());
+                transaction.setSplitId(splitId);
+                batchEntity.getTransactions().add(transaction);
+
+                TransactionEvent avroTransaction = mapToAvro(transaction);
+                avroTransaction.setSplitId(splitId);
+                splitTransactions.add(avroTransaction);
+                allTransactions.add(avroTransaction);
+            }
+
+            // Publish split to Kafka
+            BatchEvent splitEvent = BatchEvent.newBuilder()
+                    .setBatchId(batchEventDTO.getBatchId())
+                    .setSplitId(splitId)
+                    .setTransactions(splitTransactions)
+                    .setStatus(TransactionStatus.PENDING)
+                    .build();
+
+            batchProducer.sendBatch(splitEvent);
         }
 
-        //Save all transactions in bulk to database
-        List<SingleTransaction> savedTransactions = transactionRepository.saveAll(transactionsListToSave);
+        // Save batch and its transactions
+        BatchEntity savedBatch = batchRepository.save(batchEntity);
+        return mapToBatchDTO(savedBatch);
+    }
 
-        //Map saved entities back to DTOs for Kafka
-        for (SingleTransaction savedTransaction : savedTransactions) {
-            TransactionEvent event = mapToTransactionEvent(savedTransaction);
-            event.setBulkId(bulkId); //include bulkId in the event
-            String transactionJson = objectMapper.writeValueAsString(event);
+    @Transactional
+    @Async("batchProcessorExecutor")
+    public BulkEventDTO saveBulkTransactions(BulkEventDTO bulkEventDTO) {
+        BulkEntity bulkEntity = new BulkEntity();
+        bulkEntity.setBulkId(bulkEventDTO.getBulkId());
+        bulkEntity.setTransactions(new ArrayList<>());
 
-            //Publish each transaction to Kafka
-            bulkProducer.sendBulk(event.getUserId(), transactionJson);
+        // Save transactions and publish each one to Kafka
+        for (TransactionEventDTO transactionDTO : bulkEventDTO.getTransactions()) {
+            transactionDTO.validateBulkOrBatch();
 
-            events.add(event);
+            SingleTransactionEntity transaction = mapToTransactionEntity(transactionDTO, bulkEntity);
+            transaction.setAcknowledged(false); // Default to false
+            bulkEntity.getTransactions().add(transaction);
+
+            // Publish transaction to Kafka
+            TransactionEvent avroTransaction = mapToAvro(transaction);
+            bulkProducer.sendTransaction(avroTransaction);
         }
 
-        return events;
+        // Save BulkEntity (cascade transactions)
+        BulkEntity savedBulk = bulkRepository.save(bulkEntity);
+        return mapToBulkDTO(savedBulk);
     }
 
-    public BatchEvent saveBatchTransactions(BatchEvent batchEvent) throws Exception {
-        //Map DTO to BatchTransaction Entity
-        BatchTransaction batchTransaction = mapToBatchEntity(batchEvent);
+    @Transactional
+    public void handleBulkAcknowledgment(String transactionId) {
 
-        List<SingleTransaction> transactionsToSave = new ArrayList<>();
+        SingleTransactionEntity transaction = bulkRepository.findTransactionById(transactionId);
 
-        // Map and associate each TransactionEvent to BatchTransaction
-        for (TransactionEvent transactionEvent : batchEvent.getTransactions()) {
-            SingleTransaction transaction = mapToTransactionEntity(transactionEvent);
-            transaction.setBatchId(batchEvent.getBatchId()); // Link to batch
-            transactionsToSave.add(transaction);
+        if (transaction == null || transaction.getBulkId() == null) {
+            logger.warn("Transaction with ID {} does not have a valid Bulk ID.", transactionId);
+            return;
         }
 
-        //add transactions to batch entity
-        batchTransaction.setTransactions(transactionsToSave);
+        if (!transaction.isAcknowledged()) {
+            bulkRepository.saveTransaction(transaction.getTransactionId());
+        }
 
-        //Save the BatchTransaction entity (this saves transactions too due to CascadeType.ALL)
-        BatchTransaction savedBatch =  batchRepository.save(batchTransaction);
+        // Check if all transactions in the bulk are acknowledged
+        BulkEntity bulk = bulkRepository.findByBulkId(transaction.getBulkId());
 
-        // Map saved BatchTransaction to DTO
-        BatchEvent savedBatchEvent = mapToBatchEvent(savedBatch);
-        String savedBatchEventJson = objectMapper.writeValueAsString(savedBatchEvent);
+        if (bulk == null) {
+            logger.warn("No Bulk found for transaction ID {}.", transactionId);
+            return;
+        }
 
-        // Publish the batch for fraud scoring
-        batchProducer.sendBatch(savedBatchEvent.getBatchId(),savedBatchEventJson);
-
-        return savedBatchEvent;
+        if (!bulk.isAcknowledged()) {
+            int unacknowledgedCount = bulkRepository.countUnacknowledgedTransactions(bulk.getBulkId());
+            if (unacknowledgedCount == 0) {
+                bulk.setAcknowledged(true);
+                bulkRepository.save(bulk);
+                logger.info("Bulk with ID {} is now fully acknowledged.", bulk.getBulkId());
+            }
+        }
     }
 
+    public void handleBatchAcknowledgment(BatchEvent event) {
+        // Fetch the batch entity from the database
+        BatchEntity batch = batchRepository.findByBatchId(event.getBatchId().toString());
+        if (batch == null) {
+            logger.warn("Batch with ID {} not found in the database", event.getBatchId());
+            return;
+        }
 
-    private SingleTransaction mapToTransactionEntity(TransactionEvent transactionEvent) {
-        SingleTransaction transaction = new SingleTransaction();
-        transaction.setTransactionId(transactionEvent.getTransactionId());
-        transaction.setUserId(transactionEvent.getUserId());
-        transaction.setPaymentType(transactionEvent.getPaymentType());
-        transaction.setAmount(transactionEvent.getAmount());
-        transaction.setCurrency(transactionEvent.getCurrency());
-        transaction.setStatus(transactionEvent.getStatus());
-        return transaction;
+        // Idempotency Check
+        if (batch.isAcknowledged()) {
+            logger.info("Acknowledgment for batch ID {} already processed. Skipping.", event.getBatchId());
+            return;
+        }
+
+        // Update the batch status
+        batch.setAcknowledged(true);
+        batchRepository.save(batch);
+        logger.info("Batch {} acknowledged and updated in the database", event.getBatchId());
     }
 
-    private TransactionEvent mapToTransactionEvent(SingleTransaction transaction) {
-        TransactionEvent dto = new TransactionEvent();
-        dto.setTransactionId(transaction.getTransactionId());
-        dto.setUserId(transaction.getUserId());
-        dto.setPaymentType(transaction.getPaymentType());
-        dto.setAmount(transaction.getAmount());
-        dto.setCurrency(transaction.getCurrency());
-        dto.setStatus(transaction.getStatus());
-        return dto;
+//    @Scheduled(fixedRate = 30000) // Retry every 30 seconds
+//    public void retryUnacknowledgedTransactions() {
+//        try {
+//            List<SingleTransactionEntity> unacknowledgedTransactions = bulkRepository.findUnacknowledgedTransactions();
+//            for (SingleTransactionEntity transaction : unacknowledgedTransactions) {
+//                logger.info("Retrying unacknowledged transaction: {}", transaction.getTransactionId());
+//                TransactionEvent avroTransaction = mapToAvro(transaction);
+//                bulkProducer.sendTransaction(avroTransaction);
+//            }
+//        } catch (Exception e) {
+//            logger.error("Error occurred during unacknowledged transaction retry: {}", e.getMessage(), e);
+//        }
+//    }
+    private List<List<TransactionEventDTO>> splitBatch(List<TransactionEventDTO> transactions, int chunkSize) {
+        List<List<TransactionEventDTO>> chunks = new ArrayList<>();
+        for (int i = 0; i < transactions.size(); i += chunkSize) {
+            chunks.add(transactions.subList(i, Math.min(i + chunkSize, transactions.size())));
+        }
+        return chunks;
     }
 
-    private BatchTransaction mapToBatchEntity(BatchEvent batchEvent) {
-        BatchTransaction batchTransaction = new BatchTransaction();
-        batchTransaction.setBatchId(batchEvent.getBatchId());
-        batchTransaction.setBatchType(batchEvent.getBatchType());
-        return batchTransaction;
-    }
-
-    private BatchEvent mapToBatchEvent(BatchTransaction batchTransaction) {
-        BatchEvent batchEvent = new BatchEvent();
-        batchEvent.setBatchId(batchTransaction.getBatchId());
-        batchEvent.setBatchType(batchEvent.getBatchType());
-        return batchEvent;
-    }
 }
+
+

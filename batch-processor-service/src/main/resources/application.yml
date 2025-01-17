@@ -1,20 +1,81 @@
 server:
-  port: 8084
+  port: 8083
 
 spring:
+  application:
+    name: batch-processor-service
+
+  # Fall back for managing additional thread pools directly through spring's task executor
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 10
+        queue-capacity: 500
+      thread-name-prefix: "BatchProcessor-"
+
+  # Kafka Configuration
   kafka:
     bootstrap-servers: localhost:9092
+    properties:
+      schema.registry.url: http://localhost:8081
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+    consumer:
+      group-id: batch-processor-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+    listener:
+      concurrency: 3  # Number of consumer threads
 
+  # Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5432/batchbulk_db
+    url: jdbc:postgresql://localhost:5432/batchprocessor_db
     username: postgres
     password: password
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update  # Use "update" during development, "validate" for production
     show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Jackson Configuration
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+      fail-on-invalid-subtype: true
+
+
+logging:
+  level:
+    root: INFO
+    org.springframework.kafka: DEBUG
+    com.realtimefraudmonitoring: DEBUG
+
+
+
+#server:
+#  port: 8084
+#
+#spring:
+#  kafka:
+#    bootstrap-servers: localhost:9092
+#    producer:
+#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+#      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+#
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/batchbulk_db
+#    username: postgres
+#    password: password
+#    driver-class-name: org.postgresql.Driver
+#
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#    show-sql: true

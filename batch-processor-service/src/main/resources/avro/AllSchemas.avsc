@@ -1,0 +1,60 @@
+[
+  {
+    "type": "enum",
+    "name": "TransactionStatus",
+    "namespace": "com.realtimefraudmonitoring.avro",
+    "symbols": ["PENDING", "COMPLETED", "FAILED", "SUSPICIOUS"]
+  },
+  {
+    "type": "record",
+    "name": "TransactionEvent",
+    "namespace": "com.realtimefraudmonitoring.avro",
+    "fields": [
+      { "name": "transactionId", "type": "string" },
+      { "name": "userId", "type": "string" },
+      { "name": "paymentType", "type": { "type": "enum", "name": "PaymentType", "symbols": ["CREDIT", "DEBIT"] } },
+      {
+        "name": "amount",
+        "type": {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 19,
+          "scale": 4
+        }
+      },
+      { "name": "currency", "type": "string" },
+      { "name": "status", "type": "com.realtimefraudmonitoring.avro.TransactionStatus" },
+      { "name": "bulkId", "type": ["null", "string"], "default": null },
+      { "name": "batchId", "type": ["null", "string"], "default": null },
+      { "name": "splitId", "type": ["null", "string"], "default": null },
+      { "name": "source", "type": "string" }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "BatchEvent",
+    "namespace": "com.realtimefraudmonitoring.avro",
+    "fields": [
+      { "name": "batchId", "type": "string" },
+      { "name": "batchType", "type": "string" },
+      {
+        "name": "transactions",
+        "type": { "type": "array", "items": "com.realtimefraudmonitoring.avro.TransactionEvent" }
+      },
+      { "name": "status", "type": "com.realtimefraudmonitoring.avro.TransactionStatus" },
+      { "name": "splitId", "type": ["null", "string"], "default": null }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "BulkEvent",
+    "namespace": "com.realtimefraudmonitoring.avro",
+    "fields": [
+      { "name": "bulkId", "type": "string" },
+      {
+        "name": "transactions",
+        "type": { "type": "array", "items": "com.realtimefraudmonitoring.avro.TransactionEvent" }
+      }
+    ]
+  }
+]
